@@ -5,9 +5,9 @@
 [![](https://img.shields.io/crates/v/query-security-txt)](https://crates.io/crates/query-security-txt)
 
 This library defines a macro, which allows developers to provide easy-to-parse information to security researchers that wish to contact the authors of a Solana smart contract.
-It is inspired by https://securitytxt.org/.
+It is inspired by <https://securitytxt.org/>.
 
-See the an example in the Solana Explorer: https://explorer.solana.com/address/HPxKXnBN4vJ8RjpdqDCU7gvNQHeeyGnSviYTJ4fBrDt4/security?cluster=devnet
+See this example in the Solana Explorer: <https://explorer.solana.com/address/HPxKXnBN4vJ8RjpdqDCU7gvNQHeeyGnSviYTJ4fBrDt4/security?cluster=devnet>
 
 
 ## Motivation
@@ -25,7 +25,7 @@ To maximize compatibility with existing deployment setups, multisigs and DAOs, t
 
 Add the following to the `[dependencies]` section of your Cargo.toml:
 ```toml
-solana-security-txt = "1.0.1"
+solana-security-txt = "1.1.1"
 ```
 
 To install the querying tool, execute
@@ -45,9 +45,33 @@ The `security_txt` macro is intentionally kept brief. As such, it doesn't do any
 query-security-txt target/bpfel-unknown-unknown/release/example_contract.so
 ```
 
+#### Notice for library authors
+If you expect your contract to be used as a dependency in other contracts, you **must** exclude the macro when your
+contract is being built as a library, i.e., when the `no-entrypoint` feature is being used.
+Consult the example snippet below or the full example in the `example-contract` directory for details.
+
+#### Troubleshooting: linker error `multiple definition of security_txt`
+If you encounter this error during building, then that means that the `security_txt` macro has been used multiple times.
+This is probably caused by one of your dependencies also using the macro, which causes a name conflict during building.
+
+In that case, please tell the authors of that dependency to read the above notice for library authors and add the
+following to the macro to exclude it from `no-entrypoint` builds.
+```rust
+#[cfg(not(feature = "no-entrypoint"))]
+```
+
+#### Use as an indicator for the deployed code version
+
+In order to simplify access to the source code we recommend to include the commit hash as `source_revision` or the release tag as `source_release`.
+You can use the `env!` macro to automatically configure values passed to the `security_txt!` macro from the build process envioronment.
+
 ### Example
 
 ```rust
+#[cfg(not(feature = "no-entrypoint"))]
+use {default_env::default_env, solana_security_txt::security_txt};
+
+#[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
     // Required fields
     name: "Example",
@@ -58,6 +82,8 @@ security_txt! {
     // Optional Fields
     preferred_languages: "en,de",
     source_code: "https://github.com/example/example",
+    source_revision: default_env!("GITHUB_SHA", ""),
+    source_release: default_env!("GITHUB_REF_NAME", ""),
     encryption: "
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 Comment: Alice's OpenPGP certificate
@@ -94,13 +120,13 @@ If you don't pay bounties, which might be sensible for toy projects that don't h
 > We do not pay a bug bounty.
 
 For more inspiration, take a look at how other large Solana projects structure their policies (random, non-exhaustive collection):
-- https://github.com/solana-labs/solana/security/policy
-- https://forum.projectserum.com/t/formalizing-a-bug-bounty-program/410
-- https://docs.marinade.finance/developers/bug-bounty
-- https://docs.solend.fi/protocol/bug-bounty
-- https://github.com/certusone/wormhole/blob/dev.v2/ImmuneFi%20bug-bounty.md
-- https://immunefi.com/bounty/lido/ 
-- https://docs.mango.markets/mango/bug-bounty
+- <https://github.com/solana-labs/solana/security/policy>
+- <https://forum.projectserum.com/t/formalizing-a-bug-bounty-program/410>
+- <https://docs.marinade.finance/developers/bug-bounty>
+- <https://docs.solend.fi/protocol/bug-bounty>
+- <https://github.com/certusone/wormhole/blob/dev.v2/ImmuneFi%20bug-bounty.md>
+- <https://immunefi.com/bounty/lido/ >
+- <https://docs.mango.markets/mango/bug-bounty>
 
 
 ## Format
@@ -120,8 +146,10 @@ The following fields are supported, some of which are required for this to be co
 | **`contacts`**        |   list (required)    | A comma-separated list of contact information in the format `<contact type>:<contact information>`. Should roughly be ordered in preference. Possible contact types are `email`, `link`, `discord`, `telegram`, `twitter` and `other`. Prefer contact types that likely won't change for a while, like a `security@example.com` email address. |
 | **`policy`**          | link/text (required) | Either a link or a text document describing the project's security policy. This should describe what kind of bounties your project offers and the terms under which you offer them.                                                                                                                                                            |
 | `preferred_languages` |   list (optional)    | A comma-separated list of preferred languages (ISO 639-1).                                                                                                                                                                                                                                                                                     |
-| `source_code`         |   link (optional)    | A URL to the project's source code.                                                                                                                                                                                                                                                                                                            |
 | `encryption`          | link/text (optional) | A PGP public key block (or similar) or a link to one.                                                                                                                                                                                                                                                                                          |
+| `source_code`         |   link (optional)    | A URL to the project's source code.                                                                                                                                                                                                                                                                                                            |
+| `source_release`      |   string (optional   | The release identifier of this build, ideally corresponding to a tag on git that can be rebuilt to reproduce the same binary. 3rd party build verification tools will use this tag to identify a matching github releases.                                                                                                                     |
+| `source_revision`     |  string (optional)   | The revision identifier of this build, usually a git sha that can be rebuilt to reproduce the same binary. 3rd party build verification tools will use this tag to identify a matching github releases.                                                                                                                                        |
 | `auditors`            | link/list (optional) | A comma-separated list of people or entities that audited this smart contract, or a link to a page where audit reports are hosted. Note that this field is self-reported by the author of the program and might not be accurate.                                                                                                               |
 | `acknowledgements`    | link/text (optional) | Either a link or a text document containing acknowledgements to security researchers who have previously found vulnerabilities in the project.                                                                                                                                                                                                 |
 | `expiry`              |   date (optional)    | The date the security.txt will expire. The format is YYYY-MM-DD.                                                                                                                                                                                                                                                                               |
@@ -163,8 +191,8 @@ Since Solana may move away from ELF binaries in the future, this section is opti
 
 Licensed under either of
 
- * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+ * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+ * MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
 
